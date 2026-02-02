@@ -1,44 +1,65 @@
-# ScalableProjectGiorgiaPirelli
-Struttura del progetto
+# ScalableProjectGiorgiaPirelli - Earthquake Co-occurrence Analysis
 
-1. EarthquakeCooccurrenceAnalysis.scala: Punto di ingresso dell'applicazione, gestisce il parsing CSV, l'arrotondamento delle coordinate e l'estrazione della data.
-2. PairCounter.scala: Logica MapReduce principale per il calcolo e l'aggregazione della co-occorrenza di coppie.
-3. benchmarking_earthquake.ps1: Script PowerShell per automatizzare la creazione del cluster GCP, la sottomissione dei job e la raccolta delle metriche di performance.
-4. build.sbt: Configurazione di build per il progetto Scala.
-5. report/: Contiene la relazione tecnica dettagliata.
-2. Build Locale
-Compilare il progetto e generare il file JAR:
+## Struttura del progetto
+
+* `src/main/scala/EarthquakeCooccurrenceAnalysis.scala` - parte principale
+* `src/main/scala/PairCounter.scala` - logica per il calcolo delle co-occorrenze tra coppie di locazioni
+* `benchmarking_earthquake.ps1` - script PowerShell per creare cluster Dataproc, eseguire il job Spark e registrare i risultati
+
+## Parametri di configurazione
+
+Modificare le variabili nello script `benchmarking_earthquake.ps1` secondo il progetto e il bucket:
+
+```powershell
+$PROJECT        = "<YOUR_PROJECT_ID>"                    # ID del progetto 
+$REGION         = "europe-west1"                         # regione
+$ZONE           = "europe-west1-b"                       # zona 
+$BUCKET         = "<YOUR_BUCKET_NAME>"                   # nome del bucket 
+$JAR            = "gs://$BUCKET/jars/earthquake-app.jar" # nome dato al file .jar
+$INPUT          = "gs://$BUCKET/dataset-earthquakes-full.csv" # dataset
+$OUTPUT_BASE    = "gs://$BUCKET/output"                  # output
+$MACHINE_TYPE   = "n2-standard-4"                        # tipo di macchina (n1-standard-2 o n2-standard-4)
+$WORKERS_LIST   = @(2, 3, 4)                             # numero di worker da testare
+$PARTITION_COUNTS = @(4, 8, 12, 16, 24)                  # configurazioni partizioni da testare
+$CSV_FILE = "earthquake_scalability_results.csv"         # output
+```
+
+## Caricamento su bucket
+
+### Compilare il progetto
+
+```bash
 sbt clean
 sbt package
-Il JAR compilato si trova in: target/scala-2.12/speriamo_2.12-0.1.0-SNAPSHOT.jar
+```
 
-3. Deployment nel Cloud
-Configurare GCP e caricare gli asset del progetto su Google Cloud Storage:
-powershell# Impostare il progetto GCP attivo
-gcloud config set project scalableproject-482714
-
-# Creare la struttura del bucket di storage, se non è presente
-$BUCKET = "terremoti-bucket-giorgiapirelli"
-gsutil mb -l europe-west1 gs://$BUCKET/
-gsutil mb gs://$BUCKET/jars/
-gsutil mb gs://$BUCKET/dataset/
-gsutil mb gs://$BUCKET/output/
+Il JAR generato si trova in: `target/scala-2.12/earthquake-app.jar`
 
 # Caricare il JAR compilato
-gsutil cp target\scala-2.12\speriamo_2.12-0.1.0-SNAPSHOT.jar `
-  gs://terremoti-bucket-giorgiapirelli/jars/earthquake-app.jar
+gsutil cp target/scala-2.12/earthquake-app.jar `
+  gs://YOUR_BUCKET_NAME/jars/
 
-# Caricare il dataset dei terremoti
-gsutil cp .\data\earthquakes-complete.csv `
-  gs://terremoti-bucket-giorgiapirelli/dataset/
-4. Esecuzione dei Benchmark
-Lo script benchmarking_earthquake.ps1 automatizza il testing su diverse configurazioni di cluster. Modificare le variabili dello script secondo le proprie esigenze e quindi eseguire:
-powershell.\benchmarking_earthquake.ps1
-Lo script eseguirà automaticamente:
+# Esempio con il JAR utilizzato nel progetto:
+gsutil cp target/scala-2.12/speriamo_2.12-0.1.0-SNAPSHOT.jar `
+  gs://YOUR_BUCKET_NAME/jars/earthquake-app.jar
 
-Creazione di cluster Dataproc con 2 e 3 worker nodes, per probelmi legtai alla creazione con 4 worker nodes.
-Sottomissione di job Spark con partizioni ottimizzate (12, 24, 36)
-Misurazione del tempo di esecuzione per ogni configurazione
-Raccolta delle metriche in un file CSV: earthquake_scalability_results_FIXED.csv
-Calcolo della scalabilità (speedup, efficienza parallela)
-Eliminazione automatica dei cluster al termine
+# Caricare il dataset
+gsutil cp data/dataset-earthquakes-full.csv `
+  gs://YOUR_BUCKET_NAME/
+## Esecuzione script
+
+Eseguire lo script di benchmark:
+
+```powershell
+.\benchmarking_earthquake.ps1
+```
+
+## Output risultati
+
+I risultati vengono salvati nel file: `earthquake_scalability_results.csv`
+
+```
+Workers,Partitions,PartitionsPerWorker,StartTime,EndTime,DurationSeconds,Status,OutputPath
+2,8,4,2026-02-01 15:40:12,2026-02-01 15:55:24,911.99,SUCCESS,gs://YOUR_BUCKET_NAME/output/w2_p8
+3,16,5,2026-02-01 16:27:45,2026-02-01 16:35:15,450.10,SUCCESS,gs://YOUR_BUCKET_NAME/output/w3_p16
+```
