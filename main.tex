@@ -1,0 +1,465 @@
+\documentclass[8pt,a4paper]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[italian]{babel}
+\usepackage{graphicx}
+\usepackage{amsmath}
+\usepackage{float}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{hyperref}
+\usepackage{booktabs}
+\usepackage{geometry}
+
+\geometry{margin=0.65in}
+
+\lstset{
+    language=Scala,
+    basicstyle=\ttfamily\small,
+    keywordstyle=\color{blue},
+    commentstyle=\color{gray},
+    breaklines=true,
+    frame=single,
+    numbers=left
+}
+
+\title{Earthquake Co-occurrence Analysis: Strong Scalability Study}
+\date{\today}
+
+\begin{document}
+\maketitle
+
+\section{Introduzione}
+Questo progetto implementa un'applicazione in Scala per l'analisi di co-occorrenza di eventi sismici utilizzando Spark su Google Cloud Platform (Dataproc). L'obiettivo è identificare coppie di locazioni geografiche che sperimentano terremoti nello stesso giorno e valutare la scalabilità dell'applicazione su cluster di diverse dimensioni. Sono state testate due configurazioni di macchine virtuali (n2-standard-4 e n1-standard-2) con benchmarking automatizzato tramite script PowerShell.
+
+\section{Setup Infrastruttura Google Cloud}
+
+Prima di eseguire il benchmarking, è stato necessario configurare l'infrastruttura su Google Cloud Platform tramite lo script PowerShell \texttt{setup\_gcloud.ps1}, che automatizza i seguenti compiti:
+
+\begin{enumerate}
+    \item \textbf{Configurazione Progetto GCP}: imposta il progetto \texttt{scalableproject-482714}
+    \item \textbf{Creazione Bucket Cloud Storage}: crea \texttt{terremoti-bucket-giorgiapirelli} con cartelle dedicate (\texttt{jars/}, \texttt{output/})
+    \item \textbf{Build Automatico con SBT}: compila con \texttt{sbt clean} e \texttt{sbt package}
+    \item \textbf{Upload JAR in Cloud Storage}: carica il JAR compilato
+    \item \textbf{Verifica Dataset}: Controlla la presenza del dataset
+\end{enumerate}
+
+Lo script deve essere eseguito una sola volta prima del benchmarking.
+
+\section{Workflow del Sistema}
+
+Il workflow viene sviluppato:
+
+\begin{enumerate}
+    \item \textbf{Creazione Cluster}: script PowerShell crea cluster Dataproc con nodo master + N worker
+    \item \textbf{Esecuzione Job}: lancia l'applicazione via \texttt{gcloud dataproc jobs submit spark}
+    \item \textbf{Misurazione Performance}: registra tempi di esecuzione in CSV
+    \item \textbf{Pulizia}: elimina il cluster automaticamente dopo il job
+\end{enumerate}
+
+\section{Approccio Implementativo}
+
+L'applicazione implementa quattro fasi di elaborazione:
+
+\subsection{Fase 1: Parsing e Trasformazione}
+Estrazione di (data, latitudine, longitudine) da CSV, filtro header, arrotondamento coordinate alla prima cifra decimale.
+
+\subsection{Fase 2: Partizionamento}
+Utilizzo di HashPartitioner per distribuzione uniforme per data:
+\begin{lstlisting}
+val partitioned = data.partitionBy(new HashPartitioner(numPartitions))
+val grouped = partitioned.groupByKey()
+\end{lstlisting}
+
+Garantisce: distribuzione uniforme.
+
+\subsection{Fase 3: Generazione Coppie e Ricerca del Massimo}
+
+Per ogni data, vengono generate tutte le possibili coppie di locazioni co-occorrenti. Le fasi specifiche sono:
+
+\begin{itemize}
+    \item \textbf{Generazione}: tramite \texttt{flatMap}, vengono create tutte le combinazioni non ordinate di locazioni per ogni data
+    \item \textbf{Deduplicazione}: le locazioni vengono trasformate in Set per eliminare automaticamente i duplicati
+    \item \textbf{Raggruppamento}: con \texttt{groupByKey()}, tutte le date associate a ogni coppia vengono raccolte insieme
+    \item \textbf{Ricerca del Massimo}: mediante l'operazione \texttt{reduce()}, viene identificata la coppia che co-occorrerà nel maggior numero di date distinte
+\end{itemize}
+
+\subsection{Fase 4: Output}
+Salvataggio coppia vincente e lista di date di co-occorrenza.
+
+\section{Configurazioni di Test}
+
+Durante i test iniziali con n2-standard-4, si è riscontrato un errore di quota GCP nella creazione del cluster con 4 nodi worker, causando il fallimento della creazione del cluster con tale configurazione.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.9\textwidth]{error.png}
+\caption{errore di quota GCP, 20 CPU richiesti vs 16 CPU disponibili nel progetto}
+\label{fig:error_quota}
+\end{figure}
+\noindent
+A causa di questo vincolo di quota GCP, è stata adottata una strategia di test alternativa e più completa:
+
+\begin{enumerate}
+    \item \textbf{Test con n2-standard-4}: limitati a 2-3 worker con dataset completo per rispettare il vincolo di quota
+    \item \textbf{Test con n1-standard-2}: utilizzata come configurazione alternativa con 2 vCPU, 7.5 GB RAM, 100 GB disk per nodo. Questa scelta ha permesso test più estesi:
+    \begin{itemize}
+        \item \textbf{Dataset piccolo}: 2-4 worker con 4/8/12 partizioni
+        \item \textbf{Dataset completo}: 2-4 worker con 16/24 partizioni
+    \end{itemize}
+\end{enumerate}
+\noindent
+Sebbene il progetto richiedesse l'utilizzo del solo dataset completo, si è scelto di includere anche i risultati per il dataset piccolo con n1-standard-2 per fornire un'analisi comparativa più completa. 
+
+\subsection{Motivazione dei test con più partizioni}
+
+I vari test e prove sono stati eseguiti aumentando progressivamente il numero di partizioni perché \textbf{si riduceva il tempo di esecuzione}. Invece, se si manteneva troppo basso il numero di partizioni, la riduzione dei tempi \textbf{non era significativa}. 
+\noindent
+Per questo motivo, i test sono stati eseguiti partendo da \textbf{poche partizioni (4)} fino a \textbf{molte partizioni (24)} per esplorare sistematicamente l'intero range.
+
+Esempi dal range completo testato:
+
+\begin{itemize}
+    \item \textbf{n2-standard-4 con 2 worker} (range 8-24):
+    \begin{itemize}
+        \item 8 partizioni: 923.05s
+        \item 16 partizioni: 641.63s (-30.4\%, miglioramento)
+        \item 24 partizioni: 397.42s (-38.1\%, continua a migliorare)
+    \end{itemize}
+    
+    \item \textbf{n1-standard-2 dataset completo con 2 worker} (range 16-24):
+    \begin{itemize}
+        \item 16 partizioni: 2412.54
+        \item 24 partizioni: 888.59s (-63.1\%, miglioramento significativo)
+    \end{itemize}
+    
+    \item \textbf{n1-standard-2 dataset piccolo con 2 worker} (range 4-12):
+    \begin{itemize}
+        \item 4 partizioni: 1904.07s 
+        \item 8 partizioni: 1172.29s (-38.4\%, miglioramento)
+        \item 12 partizioni: 523.30s (-55.4\%, continua a migliorare)
+    \end{itemize}
+\end{itemize}
+\noindent
+Questo approccio sistematico ha permesso di scoprire che aumentare progressivamente le partizioni produceva consistenti riduzioni dei tempi di esecuzione, giustificando l'esecuzione di test con il range completo (da 4 a 24 partizioni).
+
+
+\section{Metodologia di calcolo: strong scalability su GCP Dataproc}
+
+\subsection{Formula standard vs Formula GCP Dataproc}
+
+La metrica di efficienza di scalabilità è definita come:
+
+\begin{equation}
+E(n) = \frac{S(n)}{n} = \frac{T(1)}{n \times T(n)}
+\end{equation}
+\noindent
+\textbf{Teoricamente}, $E(n) \leq 100\%$ rappresenta la scalabilità lineare perfetta. Tuttavia, il valore $T(1)$ non è disponibile sperimentalmente.
+
+\subsection{Soluzione: Formula Alternativa per GCP Dataproc}
+
+Quindi si utilizza $T(2)$ (tempo con 2 worker) come baseline, poiché è il minimo misurabile. La formula diventa:
+
+\begin{equation}
+E(n) = \frac{S(n)}{n} \times 2 = \frac{T(2)}{n \times T(n)} \times 2 = \frac{2}{n} \times S(n)
+\end{equation}
+
+dove $S(n) = T(2) / T(n)$.
+\textbf{Esempio Numerico}: con 3 worker: $E(3) = (2/3) \times 1.62 \times 100 = 108.0\%$
+
+\section{Analisi di Scalabilità}
+
+\subsection{Risultati n1-standard-2 (dataset piccolo)}
+
+\begin{table}[H]
+\centering
+\caption{Benchmark n1-standard-2 - dataset piccolo}
+\label{tab:n1_results}
+\footnotesize
+\begin{tabular}{|c|c|c|c|c|}
+\hline
+\textbf{W} & \textbf{P} & \textbf{Durata (s)} & \textbf{Speedup} & \textbf{Eff} \\
+\hline
+2 & 4 & 1904.07 & 1.00 & 100.0\% \\
+2 & 8 & 1172.29 & 1.00 & 100.0\% \\
+2 & 12 & 523.30 & 1.00 & 100.0\% \\
+\hline
+3 & 4 & 1429.39 & 1.33 & 88.7\% \\
+3 & 8 & 753.40 & 1.56 & 104.0\% \\
+3 & 12 & 431.61 & 1.21 & 80.7\% \\
+\hline
+4 & 4 & 995.01 & 1.91 & 95.5\% \\
+4 & 8 & 708.06 & 1.65 & 82.5\% \\
+4 & 12 & 349.71 & 1.50 & 75.0\% \\
+\hline
+\end{tabular}
+\end{table}
+
+\subsection{Risultati n1-standard-2 (dataset completo)}
+
+I test con n1-standard-2 sono stati estesi al dataset completo.
+
+\begin{table}[H]
+\centering
+\caption{Benchmark n1-standard-2 - dataset completo}
+\label{tab:n1_full_results}
+\footnotesize
+\begin{tabular}{|c|c|c|c|c|c|}
+\hline
+\textbf{W} & \textbf{P} & \textbf{Durata (s)} & \textbf{Speedup} & \textbf{Eff} \\
+\hline
+2 & 16 & 2412.54 & 1.00 & 100.0\% \\
+2 & 24 & 888.59 & 1.00 & 100.0\% \\
+\hline
+3 & 16 & 1489.71 & 1.62 & 108.0\% \\
+3 & 24 & 640.86 & 1.39 & 92.7\% \\
+\hline
+4 & 16 & 1109.71 & 2.17 & 108.5\% \\
+4 & 24 & 492.26 & 1.81 & 90.5\% \\
+\hline
+\end{tabular}
+\end{table}
+
+
+\subsubsection{Analisi dettagliata per numero di partizioni - n1-standard-2 dataset completo}
+
+\begin{table}[H]
+\centering
+\caption{Scalabilità con 16 partizioni (n1-standard-2 - dataset completo)}
+\begin{tabular}{|c|c|c|c|}
+\hline
+\textbf{Workers} & \textbf{Durata (s)} & \textbf{Speedup} & \textbf{Efficienza} \\
+\hline
+2 & 2412.54 & 1.00 & 100.0\% \\
+3 & 1489.71 & 1.62 & 108.0\% \\
+4 & 1109.71 & 2.17 & 108.5\% \\
+\hline
+\end{tabular}
+\end{table}
+
+\begin{table}[H]
+\centering
+\caption{Scalabilità con 24 partizioni (n1-standard-2 - dataset completo)}
+\begin{tabular}{|c|c|c|c|}
+\hline
+\textbf{Workers} & \textbf{Durata (s)} & \textbf{Speedup} & \textbf{Efficienza} \\
+\hline
+2 & 888.59 & 1.00 & 100.0\% \\
+3 & 640.86 & 1.39 & 92.7\% \\
+4 & 492.26 & 1.81 & 90.5\% \\
+\hline
+\end{tabular}
+\end{table}
+
+\subsection{Risultati n2-standard-4 (dataset completo)}
+
+Questo set di test con n2-standard-4 e dataset completo mostra i risultati con configurazioni di partizioni da 8 a 24.
+
+\begin{table}[H]
+\centering
+\caption{Benchmark complessivo n2-standard-4 - Tutte le partizioni}
+\label{tab:n2_complete_all}
+\footnotesize
+\begin{tabular}{|c|c|c|c|c|}
+\hline
+\textbf{Workers} & \textbf{Partizioni} & \textbf{Durata (s)} & \textbf{Speedup} & \textbf{Efficienza} \\
+\hline
+2 & 8 & 911.99 & 1.00 & 100.0\% \\
+2 & 16 & 537.13 & 1.00 & 100.0\% \\
+2 & 24 & 389.19 & 1.00 & 100.0\% \\
+\hline
+3 & 8 & 772.00 & 1.18 & 78.7\% \\
+3 & 16 & 450.10 & 1.19 & 79.3\% \\
+3 & 24 & 284.99 & 1.37 & 91.3\% \\
+\hline
+\end{tabular}
+\end{table}
+
+\textbf{Osservazioni n2-standard-4 completo:} configurazione ottimale con 24 partizioni + 3 worker (speedup 1.37x, efficienza 91.3\%)
+
+\subsubsection{Analisi dettagliata per partizioni - n2-standard-4 dataset completo}
+
+\begin{table}[H]
+\centering
+\caption{Scalabilità con 8 partizioni (n2-standard-4 - Dataset Completo)}
+\begin{tabular}{|c|c|c|c|}
+\hline
+\textbf{Workers} & \textbf{Durata (s)} & \textbf{Speedup} & \textbf{Efficienza} \\
+\hline
+2 & 911.99 & 1.00 & 100.0\% \\
+3 & 772.00 & 1.18 & 78.7\% \\
+\hline
+\end{tabular}
+\end{table}
+
+\begin{table}[H]
+\centering
+\caption{Scalabilità con 16 partizioni (n2-standard-4 - Dataset Completo)}
+\begin{tabular}{|c|c|c|c|}
+\hline
+\textbf{Workers} & \textbf{Durata (s)} & \textbf{Speedup} & \textbf{Efficienza} \\
+\hline
+2 & 537.13 & 1.00 & 100.0\% \\
+3 & 450.10 & 1.19 & 79.3\% \\
+\hline
+\end{tabular}
+\end{table}
+
+\begin{table}[H]
+\centering
+\caption{Scalabilità con 24 partizioni (n2-standard-4 - Dataset Completo)}
+\begin{tabular}{|c|c|c|c|}
+\hline
+\textbf{Workers} & \textbf{Durata (s)} & \textbf{Speedup} & \textbf{Efficienza} \\
+\hline
+2 & 389.19 & 1.00 & 100.0\% \\
+3 & 284.99 & 1.37 & 91.3\% \\
+\hline
+\end{tabular}
+\end{table}
+
+
+\subsubsection{Analisi Dettagliata per Numero di Partizioni - n2-standard-4}
+
+\begin{table}[H]
+\centering
+\caption{Scalabilità con 8 partizioni (n2-standard-4)}
+\begin{tabular}{|c|c|c|c|}
+\hline
+\textbf{Workers} & \textbf{Durata (s)} & \textbf{Speedup} & \textbf{Efficienza} \\
+\hline
+2 & 923.05 & 1.00 & 100.0\% \\
+3 & 883.41 & 1.04 & 69.3\% \\
+\hline
+\end{tabular}
+\end{table}
+
+\begin{table}[H]
+\centering
+\caption{Scalabilità con 16 partizioni (n2-standard-4)}
+\begin{tabular}{|c|c|c|c|}
+\hline
+\textbf{Workers} & \textbf{Durata (s)} & \textbf{Speedup} & \textbf{Efficienza} \\
+\hline
+2 & 641.63 & 1.00 & 100.0\% \\
+3 & 526.52 & 1.22 & 81.3\% \\
+\hline
+\end{tabular}
+\end{table}
+
+\begin{table}[H]
+\centering
+\caption{Scalabilità con 24 partizioni (n2-standard-4)}
+\begin{tabular}{|c|c|c|c|}
+\hline
+\textbf{Workers} & \textbf{Durata (s)} & \textbf{Speedup} & \textbf{Efficienza} \\
+\hline
+2 & 397.42 & 1.00 & 100.0\% \\
+3 & 288.43 & 1.38 & 92.0\% \\
+\hline
+\end{tabular}
+\end{table}
+
+
+\subsection{Seconda prova con n2-standard-4}
+
+Questo secondo set di test con n2-standard-4 e dataset completo mostra i risultati con configurazioni di partizioni da 4 a 24.
+\begin{table}[H]
+\centering
+\caption{Benchmark completo n2-standard-4 - Tutte le partizioni}
+\label{tab:n2_complete_all}
+\footnotesize
+\begin{tabular}{|c|c|c|c|}
+\hline
+\textbf{Workers} & \textbf{Durata (s)} & \textbf{Speedup} & \textbf{Efficienza} \\
+\hline
+2 & 1034.07 & 1.00 & 100.0\% \\
+2 & 920.30 & 1.00 & 100.0\% \\
+2 & 583.71 & 1.00 & 100.0\% \\
+2 & 400.04 & 1.00 & 100.0\% \\
+\hline
+3 & 862.90 & 1.20 & 80.0\% \\
+3 & 773.76 & 1.19 & 79.3\% \\
+3 & 380.04 & 1.54 & 102.7\% \\
+3 & 275.39 & 1.45 & 96.7\% \\
+\hline
+\end{tabular}
+\end{table}
+\noindent
+\textbf{Osservazioni n2-standard-4 completo:} configurazione ottimale con 16 partizioni + 3 worker (speedup 1.54x, efficienza 102.7\%)
+
+\subsubsection{Analisi Dettagliata per Partizioni - n2-standard-4 completo}
+
+\begin{table}[H]
+\centering
+\caption{Scalabilità con 4 partizioni (n2-standard-4)}
+\begin{tabular}{|c|c|c|c|}
+\hline
+\textbf{Workers} & \textbf{Durata (s)} & \textbf{Speedup} & \textbf{Efficienza} \\
+\hline
+2 & 1034.07 & 1.00 & 100.0\% \\
+3 & 862.90 & 1.20 & 80.0\% \\
+\hline
+\end{tabular}
+\end{table}
+
+\begin{table}[H]
+\centering
+\caption{Scalabilità con 8 partizioni (n2-standard-4)}
+\begin{tabular}{|c|c|c|c|}
+\hline
+\textbf{Workers} & \textbf{Durata (s)} & \textbf{Speedup} & \textbf{Efficienza} \\
+\hline
+2 & 920.30 & 1.00 & 100.0\% \\
+3 & 773.76 & 1.19 & 79.3\% \\
+\hline
+\end{tabular}
+\end{table}
+
+\begin{table}[H]
+\centering
+\caption{Scalabilità con 16 partizioni (n2-standard-4)}
+\begin{tabular}{|c|c|c|c|}
+\hline
+\textbf{Workers} & \textbf{Durata (s)} & \textbf{Speedup} & \textbf{Efficienza} \\
+\hline
+2 & 583.71 & 1.00 & 100.0\% \\
+3 & 380.04 & 1.54 & 102.7\% \\
+\hline
+\end{tabular}
+\end{table}
+
+\begin{table}[H]
+\centering
+\caption{Scalabilità con 24 partizioni (n2-standard-4)}
+\begin{tabular}{|c|c|c|c|}
+\hline
+\textbf{Workers} & \textbf{Durata (s)} & \textbf{Speedup} & \textbf{Efficienza} \\
+\hline
+2 & 400.04 & 1.00 & 100.0\% \\
+3 & 275.39 & 1.45 & 96.7\% \\
+\hline
+\end{tabular}
+\end{table}
+
+\subsubsection{Analisi Comparativa: Tutte le Configurazioni}
+
+La Tabella \ref{tab:comparison_all} confronta i risultati delle configurazioni ottimali tra dataset piccolo n1-standard-2, dataset completo n1-standard-2, e dataset completo n2-standard-4.
+
+\begin{table}[H]
+\centering
+\caption{Confronto configurazioni ottimali}
+\label{tab:comparison_all}
+\begin{tabular}{|l|l|c|c|c|c|}
+\hline
+\textbf{Machine} & \textbf{Dataset} & \textbf{Config Opt} & \textbf{Speedup} & \textbf{Efficienza} \\
+\hline
+n1-standard-2 & Piccolo  & 8p + 3w & 1.56x & 104.0\% \\
+n1-standard-2 & Completo & 16p + 4w & 2.17x & 108.5\% \\
+n2-standard-4 & Completo & 24p + 3w & 1.38x & 92.0\% \\
+\hline
+\end{tabular}
+\end{table}
+
+\section{Codice Sorgente:} \url{https://github.com/giorgiapirelli/ScalableProjectGiorgiaPirelli.git}
+
+\end{document}
