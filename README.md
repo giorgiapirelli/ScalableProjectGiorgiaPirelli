@@ -4,7 +4,7 @@
 
 * `src/main/scala/EarthquakeCooccurrenceAnalysis.scala` - parte principale
 * `src/main/scala/PairCounter.scala` - logica per il calcolo delle co-occorrenze tra coppie di locazioni
-* setup_gcloud.ps1 - script PowerShell per la configurazione automatica di Google Cloud Storage
+* `setup_gcloud.ps1` - script PowerShell per la configurazione automatica di Google Cloud Storage
 * `benchmarking_earthquake.ps1` - script PowerShell per creare cluster Dataproc, eseguire il job Spark e registrare i risultati
 
 Lo script `setup_gcloud.ps1` automatizza la configurazione dell'infrastruttura su Google Cloud Platform. Esegue le seguenti operazioni:
@@ -83,8 +83,7 @@ sbt clean
 sbt package
 ```
 
-Il JAR generato si trova in: `target/scala-2.12/speriamo_2.12-0.1.0-SNAPSHOT.jar` 
-- esempio nella mia cartella sorgente -
+Il JAR generato si trova in: `target/scala-2.12/speriamo_2.12-0.1.0-SNAPSHOT.jar` (esempio nella mia cartella sorgente).
 
 ### Step 2: Eseguire setup automatico
 
