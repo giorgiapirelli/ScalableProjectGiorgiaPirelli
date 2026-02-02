@@ -8,44 +8,18 @@
 * `benchmarking_earthquake.ps1` - script PowerShell per creare cluster Dataproc, eseguire il job Spark e registrare i risultati
 
 Lo script `setup_gcloud.ps1` automatizza la configurazione dell'infrastruttura su Google Cloud Platform. Esegue le seguenti operazioni:
-
-### Operazioni del setup script
-
-
-1. **Creazione/Verifica Bucket GCS**
-   - Controlla se il bucket esiste già
-   - Se non esiste, lo crea nella regione specificata
-   - Crea la struttura logica delle cartelle (jars/, output/)
-
-2. **Build Automatico JAR**
-   - Verifica se il JAR compilato esiste già
-   - Se non esiste, esegue `sbt clean` e `sbt package`
-   - Se esiste, salta il build per risparmiare tempo
-
-3. **Upload JAR su GCS**
-   - Controlla se il JAR è già presente in GCS
-   - Se non esiste, carica il JAR compilato nel bucket
-   - Rinomina il JAR al nome specificato (es. `earthquake-app.jar`)
-
-4. **Verifica Dataset**
-   - Verifica che il dataset CSV sia presente nel bucket
-   - Segnala errore se il dataset non è disponibile
-
-5. **Riepilogo Finale**
-   - Visualizza il contenuto completo del bucket
-   - Mostra i percorsi finali di JAR, dataset e output
   
 ### Configurazione setup_gcloud.ps1
 
 Modificare le variabili all'inizio dello script:
 
 ```powershell
-$PROJECT_ID = "YOUR_PROJECT_ID"                          # ID del progetto GCP
-$BUCKET_NAME = "YOUR_BUCKET_NAME"                        # Nome del bucket GCS
-$REGION = "europe-west1"                                 # Regione GCP
-$SBT_JAR_PATH = "target\scala-2.12\speriamo_2.12-0.1.0-SNAPSHOT.jar"  # Percorso JAR compilato da SBT
-$JAR_NAME = "earthquake-app.jar"                         # Nome JAR nel bucket
-$DATASET_NAME = "dataset-earthquakes-full.csv"           # Nome dataset nel bucket
+$PROJECT_ID = "YOUR_PROJECT_ID"                          # ID del progetto 
+$BUCKET_NAME = "YOUR_BUCKET_NAME"                        # nome del bucket 
+$REGION = "europe-west1"                                 # regione 
+$SBT_JAR_PATH = "target\scala-2.12\speriamo_2.12-0.1.0-SNAPSHOT.jar"  # percorso JAR compilato da SBT (esempio utilizzato)
+$JAR_NAME = "earthquake-app.jar"                         # nome JAR nel bucket
+$DATASET_NAME = "dataset-earthquakes-full.csv"           # nome dataset nel bucket
 ```
 
 ### Esecuzione setup
