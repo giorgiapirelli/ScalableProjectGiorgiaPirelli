@@ -4,7 +4,57 @@
 
 * `src/main/scala/EarthquakeCooccurrenceAnalysis.scala` - parte principale
 * `src/main/scala/PairCounter.scala` - logica per il calcolo delle co-occorrenze tra coppie di locazioni
+* setup_gcloud.ps1 - script PowerShell per la configurazione automatica di Google Cloud Storage
 * `benchmarking_earthquake.ps1` - script PowerShell per creare cluster Dataproc, eseguire il job Spark e registrare i risultati
+
+Lo script `setup_gcloud.ps1` automatizza la configurazione dell'infrastruttura su Google Cloud Platform. Esegue le seguenti operazioni:
+
+### Operazioni del setup script
+
+
+1. **Creazione/Verifica Bucket GCS**
+   - Controlla se il bucket esiste già
+   - Se non esiste, lo crea nella regione specificata
+   - Crea la struttura logica delle cartelle (jars/, output/)
+
+2. **Build Automatico JAR**
+   - Verifica se il JAR compilato esiste già
+   - Se non esiste, esegue `sbt clean` e `sbt package`
+   - Se esiste, salta il build per risparmiare tempo
+
+3. **Upload JAR su GCS**
+   - Controlla se il JAR è già presente in GCS
+   - Se non esiste, carica il JAR compilato nel bucket
+   - Rinomina il JAR al nome specificato (es. `earthquake-app.jar`)
+
+4. **Verifica Dataset**
+   - Verifica che il dataset CSV sia presente nel bucket
+   - Segnala errore se il dataset non è disponibile
+
+5. **Riepilogo Finale**
+   - Visualizza il contenuto completo del bucket
+   - Mostra i percorsi finali di JAR, dataset e output
+  
+### Configurazione setup_gcloud.ps1
+
+Modificare le variabili all'inizio dello script:
+
+```powershell
+$PROJECT_ID = "YOUR_PROJECT_ID"                          # ID del progetto GCP
+$BUCKET_NAME = "YOUR_BUCKET_NAME"                        # Nome del bucket GCS
+$REGION = "europe-west1"                                 # Regione GCP
+$SBT_JAR_PATH = "target\scala-2.12\speriamo_2.12-0.1.0-SNAPSHOT.jar"  # Percorso JAR compilato da SBT
+$JAR_NAME = "earthquake-app.jar"                         # Nome JAR nel bucket
+$DATASET_NAME = "dataset-earthquakes-full.csv"           # Nome dataset nel bucket
+```
+
+### Esecuzione setup
+
+Eseguire lo script di setup prima di avviare il benchmark:
+
+```powershell
+.\setup_gcloud.ps1
+```
 
 ## Parametri di configurazione
 
@@ -26,27 +76,23 @@ $CSV_FILE = "earthquake_scalability_results.csv"         # output
 
 ## Caricamento su bucket
 
-### Compilare il progetto
+### Step 1: Si può anche compilare il progetto manualmente
 
 ```bash
 sbt clean
 sbt package
 ```
 
-Il JAR generato si trova in: `target/scala-2.12/earthquake-app.jar`
+Il JAR generato si trova in: `target/scala-2.12/speriamo_2.12-0.1.0-SNAPSHOT.jar` 
+- esempio nella mia cartella sorgente -
 
-# Caricare il JAR compilato
-gsutil cp target/scala-2.12/earthquake-app.jar `
-  gs://YOUR_BUCKET_NAME/jars/
+### Step 2: Eseguire setup automatico
 
-# Esempio con il JAR utilizzato nel progetto:
-gsutil cp target/scala-2.12/speriamo_2.12-0.1.0-SNAPSHOT.jar `
-  gs://YOUR_BUCKET_NAME/jars/earthquake-app.jar
+```powershell
+.\setup_gcloud.ps1
+```
 
-# Caricare il dataset
-gsutil cp data/dataset-earthquakes-full.csv `
-  gs://YOUR_BUCKET_NAME/
-## Esecuzione script
+## Esecuzione Benchmark
 
 Eseguire lo script di benchmark:
 
