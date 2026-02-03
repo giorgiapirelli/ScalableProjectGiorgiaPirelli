@@ -10,7 +10,7 @@
 \usepackage{booktabs}
 \usepackage{geometry}
 
-\geometry{margin=0.65in}
+\geometry{margin=0.55in}
 
 \lstset{
     language=Scala,
@@ -84,7 +84,19 @@ Per ogni data, vengono generate tutte le possibili coppie di locazioni co-occorr
 \end{itemize}
 
 \subsection{Fase 4: Output}
-Salvataggio coppia vincente e lista di date di co-occorrenza.
+
+Durante l'esecuzione del job, l'applicazione genera un output che identifica la coppia di locazioni con il massimo numero di co-occorrenze. La coppia vincente viene stampata nei log del job Spark, mentre la lista completa delle date di co-occorrenza viene salvata in un file di output.
+
+\subsection{Stampa della Coppia Vincente nei Log}
+
+La coppia vincente e il numero totale di co-occorrenze vengono stampati nei log del job Spark durante l'esecuzione:
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.5\textwidth]{job.png}
+\caption{La coppia di locazioni $(-122.8, 38.8)$ e $(-122.7, 38.8)$ viene stampata nei log insieme al numero totale di co-occorrenze (10.014). L'output è visibile nella scheda ``Riepilogo'' del job.}
+\label{fig:job_output}
+\end{figure}
 
 \section{Configurazioni di Test}
 

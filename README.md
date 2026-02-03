@@ -82,3 +82,5 @@ Workers,Partitions,PartitionsPerWorker,StartTime,EndTime,DurationSeconds,Status,
 2,8,4,2026-02-01 15:40:12,2026-02-01 15:55:24,911.99,SUCCESS,gs://YOUR_BUCKET_NAME/output/w2_p8
 3,16,5,2026-02-01 16:27:45,2026-02-01 16:35:15,450.10,SUCCESS,gs://YOUR_BUCKET_NAME/output/w3_p16
 ```
+Esempio file di output:
+Il file `output_w3_p16_part-00000` contiene la lista completa delle date di co-occorrenza in formato YYYY-MM-DD, una per riga in ordine cronologico.
