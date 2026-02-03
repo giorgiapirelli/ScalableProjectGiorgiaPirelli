@@ -10,7 +10,7 @@
 Lo script `setup_gcloud.ps1` automatizza la configurazione, eseguendo i seguenti compiti:
 * Configurazione progetto: imposta il progetto scalableproject-482714
 * Creazione bucket Cloud Storage: crea terremoti-bucket-giorgiapirelli (il bucket) con cartelle dedicate jars/, output/
-* Build Automatico con SBT: compila con \texttt{sbt clean} e sbt package
+* Build Automatico con SBT: compila con sbt clean e sbt package
 * Upload JAR: carica il JAR compilato
 * Verifica dataset: controlla la presenza del dataset
 
