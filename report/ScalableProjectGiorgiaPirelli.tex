@@ -31,20 +31,6 @@
 \section{Introduzione}
 Questo progetto implementa un'applicazione in Scala per l'analisi di co-occorrenza di eventi sismici utilizzando Spark su Google Cloud Platform (Dataproc). L'obiettivo è identificare coppie di locazioni geografiche che sperimentano terremoti nello stesso giorno e valutare la scalabilità dell'applicazione su cluster di diverse dimensioni. Sono state testate due configurazioni di macchine virtuali (n2-standard-4 e n1-standard-2) con benchmarking automatizzato tramite script PowerShell.
 
-\section{Setup Infrastruttura Google Cloud}
-
-Prima di eseguire il benchmarking, è stato necessario configurare l'infrastruttura su Google Cloud Platform tramite lo script PowerShell \texttt{setup\_gcloud.ps1}, che automatizza i seguenti compiti:
-
-\begin{enumerate}
-    \item \textbf{Configurazione Progetto GCP}: imposta il progetto \texttt{scalableproject-482714}
-    \item \textbf{Creazione Bucket Cloud Storage}: crea \texttt{terremoti-bucket-giorgiapirelli} con cartelle dedicate (\texttt{jars/}, \texttt{output/})
-    \item \textbf{Build Automatico con SBT}: compila con \texttt{sbt clean} e \texttt{sbt package}
-    \item \textbf{Upload JAR in Cloud Storage}: carica il JAR compilato
-    \item \textbf{Verifica Dataset}: Controlla la presenza del dataset
-\end{enumerate}
-
-Lo script deve essere eseguito una sola volta prima del benchmarking.
-
 \section{Workflow del Sistema}
 
 Il workflow viene sviluppato:
@@ -86,9 +72,9 @@ Per ogni data, vengono generate tutte le possibili coppie di locazioni co-occorr
 \subsection{Fase 4: Output}
 
 Durante l'esecuzione del job, l'applicazione genera un output che identifica la coppia di locazioni con il massimo numero di co-occorrenze. La coppia vincente viene stampata nei log del job Spark, mentre la lista completa delle date di co-occorrenza viene salvata in un file di output.
+\bigskip
 
-\subsection{Stampa della Coppia Vincente nei Log}
-
+\noindent
 La coppia vincente e il numero totale di co-occorrenze vengono stampati nei log del job Spark durante l'esecuzione:
 
 \begin{figure}[H]

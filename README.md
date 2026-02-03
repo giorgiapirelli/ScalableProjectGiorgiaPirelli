@@ -7,7 +7,14 @@
 * `setup_gcloud.ps1` - script PowerShell per la configurazione automatica 
 * `benchmarking_earthquake.ps1` - script PowerShell per creare cluster Dataproc, eseguire il job Spark e registrare i risultati
 
-Lo script `setup_gcloud.ps1` automatizza la configurazione. Esegue le seguenti operazioni:
+Lo script `setup_gcloud.ps1` automatizza la configurazione, eseguendo i seguenti compiti:
+* Configurazione progetto: imposta il progetto scalableproject-482714
+* Creazione bucket Cloud Storage: crea terremoti-bucket-giorgiapirelli (il bucket) con cartelle dedicate jars/, output/
+* Build Automatico con SBT: compila con \texttt{sbt clean} e sbt package
+* Upload JAR: carica il JAR compilato
+* Verifica dataset: controlla la presenza del dataset
+
+Lo script deve essere eseguito una sola volta prima del benchmarking.
   
 ### Configurazione setup_gcloud.ps1
 

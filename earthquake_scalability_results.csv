@@ -1,7 +1,1 @@
 ﻿Workers,Partitions,PartitionsPerWorker,StartTime,EndTime,DurationSeconds,Status,OutputPath
-2,8,4,2026-02-01 15:40:12,2026-02-01 15:55:24,911.99,SUCCESS,gs://terremoti-bucket-giorgiapirelli/output/w2_p8
-2,16,8,2026-02-01 15:55:34,2026-02-01 16:04:31,537.13,SUCCESS,gs://terremoti-bucket-giorgiapirelli/output/w2_p16
-2,24,12,2026-02-01 16:04:41,2026-02-01 16:11:10,389.19,SUCCESS,gs://terremoti-bucket-giorgiapirelli/output/w2_p24
-3,8,2,2026-02-01 16:14:44,2026-02-01 16:27:36,772,SUCCESS,gs://terremoti-bucket-giorgiapirelli/output/w3_p8
-3,16,5,2026-02-01 16:27:45,2026-02-01 16:35:15,450.1,SUCCESS,gs://terremoti-bucket-giorgiapirelli/output/w3_p16
-3,24,8,2026-02-01 16:35:25,2026-02-01 16:40:10,284.99,SUCCESS,gs://terremoti-bucket-giorgiapirelli/output/w3_p24
