@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Configuration status="OFF" strict="true">
+    <Appenders>
+        <!-- Appender che non stampa nulla per i log di sistema -->
+        <Null name="Null"/>
+        <!-- Appender console solo per l'output dell'applicazione -->
+        <Console name="Console" target="SYSTEM_OUT">
+            <PatternLayout pattern="%msg%n"/>
+        </Console>
+    </Appenders>
+
+    <Loggers>
+        <!-- Disabilita TUTTI i logger di sistema -->
+        <Logger name="org" level="OFF" additivity="false">
+            <AppenderRef ref="Null"/>
+        </Logger>
+        <Logger name="io.netty" level="OFF" additivity="false">
+            <AppenderRef ref="Null"/>
+        </Logger>
+        <Logger name="org.apache" level="OFF" additivity="false">
+            <AppenderRef ref="Null"/>
+        </Logger>
+        <Logger name="com" level="OFF" additivity="false">
+            <AppenderRef ref="Null"/>
+        </Logger>
+        <Logger name="sun" level="OFF" additivity="false">
+            <AppenderRef ref="Null"/>
+        </Logger>
+
+        <!-- Logger per la nostra applicazione - mostra solo messaggi dell'app -->
+        <Logger name="EarthquakeCooccurrence" level="INFO" additivity="false">
+            <AppenderRef ref="Console"/>
+        </Logger>
+
+        <!-- Root completamente disabilitato -->
+        <Root level="OFF">
+            <AppenderRef ref="Null"/>
+        </Root>
+    </Loggers>
+</Configuration>
